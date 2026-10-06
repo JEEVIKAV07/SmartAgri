@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  FARMER
+  BUYER
+  ADMIN
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  REMOVED
+}
+
+enum OrderStatus {
+  PLACED
+  ACCEPTED
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
+enum ReportReason {
+  FAKE_PRODUCT
+  INCORRECT_INFORMATION
+  MISLEADING_IMAGE
+  POOR_QUALITY
+  SUSPICIOUS_FARMER
+  PAYMENT_ISSUE
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id                String                   @id @default(cuid())
+  email             String                   @unique
+  passwordHash      String
+  name              String
+  role              Role
+  locale            String                   @default("en")
+  phone             String?
+  village           String?
+  isActive          Boolean                  @default(true)
+  createdAt         DateTime                 @default(now())
+  listings          Listing[]                @relation("FarmerListings")
+  buyerOrders       Order[]                  @relation("BuyerOrders")
+  farmerOrders      Order[]                  @relation("FarmerOrders")
+  sentMessages      Message[]
+  buyerReviews      Review[]                 @relation("BuyerReviews")
+  farmerReviews     Review[]                 @relation("FarmerReviews")
+  verifications     VerificationSubmission[]
+  buyerThreads      Conversation[]           @relation("BuyerConversations")
+  farmerThreads     Conversation[]           @relation("FarmerConversations")
+  reportsFiled      Report[]                 @relation("ReportAuthors")
+  reportsAbout      Report[]                 @relation("ReportedFarmers")
+}
+
+model Listing {
+  id           String         @id @default(cuid())
+  farmerId     String
+  crop         String
+  variety      String?
+  quantity     Float
+  unit         String         @default("kg")
+  pricePerKg   Float
+  location     String
+  harvestDate  DateTime?
+  imageUrl     String?
+  status       ListingStatus  @default(ACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  farmer       User           @relation("FarmerListings", fields: [farmerId], references: [id], onDelete: Cascade)
+  orders       Order[]
+  conversations Conversation[]
+  reports       Report[]
+
+  @@index([status, crop, location])
+}
+
+model Order {
+  id            String        @id @default(cuid())
+  listingId     String
+  buyerId       String
+  farmerId      String
+  quantity      Float
+  unitPrice     Float
+  total         Float
+  status        OrderStatus   @default(PLACED)
+  note          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  listing       Listing       @relation(fields: [listingId], references: [id])
+  buyer         User          @relation("BuyerOrders", fields: [buyerId], references: [id])
+  farmer        User          @relation("FarmerOrders", fields: [farmerId], references: [id])
+  review        Review?
+  conversation  Conversation?
+
+  @@index([buyerId, createdAt])
+  @@index([farmerId, createdAt])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  buyerId   String
+  farmerId  String
+  listingId String
+  orderId   String?   @unique
+  createdAt DateTime  @default(now())
+  buyer     User      @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  farmer    User      @relation("FarmerConversations", fields: [farmerId], references: [id], onDelete: Cascade)
+  listing   Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  order     Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  messages  Message[]
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String       @db.VarChar(2000)
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model VerificationSubmission {
+  id           String             @id @default(cuid())
+  farmerId     String
+  farmName     String
+  district     String
+  documentRef  String
+  status       VerificationStatus @default(PENDING)
+  reviewerId   String?
+  decisionNote String?
+  createdAt    DateTime           @default(now())
+  reviewedAt   DateTime?
+  farmer       User               @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  orderId   String       @unique
+  buyerId   String
+  farmerId  String
+  rating    Int
+  body      String       @db.VarChar(1200)
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer     User         @relation("BuyerReviews", fields: [buyerId], references: [id])
+  farmer    User         @relation("FarmerReviews", fields: [farmerId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model Report {
+  id               String       @id @default(cuid())
+  reporterId       String
+  reportedFarmerId String?
+  listingId        String?
+  reason           ReportReason
+  details          String?      @db.VarChar(1200)
+  status           ReportStatus @default(OPEN)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  reporter         User         @relation("ReportAuthors", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedFarmer   User?        @relation("ReportedFarmers", fields: [reportedFarmerId], references: [id], onDelete: SetNull)
+  listing          Listing?     @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([listingId])
+}
+
+model RateLimitBucket {
+  id          String   @id
+  count       Int      @default(0)
+  windowEndsAt DateTime
+
+  @@index([windowEndsAt])
+}
