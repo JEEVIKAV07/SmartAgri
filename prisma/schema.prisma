@@ -85,11 +85,13 @@ model Listing {
   farmerId     String
   crop         String
   variety      String?
+  grade        String?
   quantity     Float
   unit         String         @default("kg")
   pricePerKg   Float
   location     String
   harvestDate  DateTime?
+  availableUntil DateTime?
   imageUrl     String?
   status       ListingStatus  @default(ACTIVE)
   createdAt    DateTime       @default(now())

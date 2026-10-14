@@ -24,12 +24,12 @@ async function main() {
 
   const tomato = await prisma.listing.upsert({
     where: { id: "listing-tomato" },
-    update: {},
-    create: { id: "listing-tomato", farmerId: farmer.id, crop: "Tomato", variety: "Hybrid · Grade A", quantity: 420, unit: "kg", pricePerKg: 28, location: "Thondamuthur, Coimbatore", status: "ACTIVE" },
+    update: { grade: "A", harvestDate: new Date("2026-09-22T00:00:00Z"), availableUntil: new Date("2026-10-30T00:00:00Z") },
+    create: { id: "listing-tomato", farmerId: farmer.id, crop: "Tomato", variety: "Hybrid", grade: "A", quantity: 420, unit: "kg", pricePerKg: 28, location: "Thondamuthur, Coimbatore", harvestDate: new Date("2026-09-22T00:00:00Z"), availableUntil: new Date("2026-10-30T00:00:00Z"), status: "ACTIVE" },
   });
-  await prisma.listing.upsert({ where: { id: "listing-banana" }, update: {}, create: { id: "listing-banana", farmerId: farmer.id, crop: "Banana", variety: "Poovan · freshly cut", quantity: 860, unit: "kg", pricePerKg: 42, location: "Pollachi, Coimbatore", status: "ACTIVE" } });
-  await prisma.listing.upsert({ where: { id: "listing-rice" }, update: {}, create: { id: "listing-rice", farmerId: farmer.id, crop: "Paddy", variety: "CO 51 · 2025 harvest", quantity: 1200, unit: "kg", pricePerKg: 31, location: "Kumbakonam, Thanjavur", status: "ACTIVE" } });
-  await prisma.listing.upsert({ where: { id: "listing-onion" }, update: {}, create: { id: "listing-onion", farmerId: farmer.id, crop: "Onion", variety: "Small onion · cured", quantity: 275, unit: "kg", pricePerKg: 56, location: "Palladam, Tiruppur", status: "ACTIVE" } });
+  await prisma.listing.upsert({ where: { id: "listing-banana" }, update: { grade: "Freshly cut", harvestDate: new Date("2026-09-25T00:00:00Z") }, create: { id: "listing-banana", farmerId: farmer.id, crop: "Banana", variety: "Poovan", grade: "Freshly cut", quantity: 860, unit: "kg", pricePerKg: 42, location: "Pollachi, Coimbatore", harvestDate: new Date("2026-09-25T00:00:00Z"), status: "ACTIVE" } });
+  await prisma.listing.upsert({ where: { id: "listing-rice" }, update: { grade: "A", harvestDate: new Date("2026-09-18T00:00:00Z") }, create: { id: "listing-rice", farmerId: farmer.id, crop: "Paddy", variety: "CO 51", grade: "A", quantity: 1200, unit: "kg", pricePerKg: 31, location: "Kumbakonam, Thanjavur", harvestDate: new Date("2026-09-18T00:00:00Z"), status: "ACTIVE" } });
+  await prisma.listing.upsert({ where: { id: "listing-onion" }, update: { grade: "Cured", harvestDate: new Date("2026-09-24T00:00:00Z") }, create: { id: "listing-onion", farmerId: farmer.id, crop: "Onion", variety: "Small onion", grade: "Cured", quantity: 275, unit: "kg", pricePerKg: 56, location: "Palladam, Tiruppur", harvestDate: new Date("2026-09-24T00:00:00Z"), status: "ACTIVE" } });
 
   await prisma.order.upsert({ where: { id: "SA-2048" }, update: {}, create: { id: "SA-2048", listingId: tomato.id, buyerId: buyer.id, farmerId: farmer.id, quantity: 60, unitPrice: 28, total: 1680, status: "PLACED" } });
   const completed = await prisma.order.upsert({ where: { id: "SA-1988" }, update: {}, create: { id: "SA-1988", listingId: "listing-banana", buyerId: buyer.id, farmerId: farmer.id, quantity: 40, unitPrice: 42, total: 1680, status: "COMPLETED" } });

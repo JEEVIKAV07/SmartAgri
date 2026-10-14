@@ -23,12 +23,12 @@ Without PostgreSQL, the app opens in an explicitly labeled demo preview. Preview
 ## Workflows
 
 - Buyers can search and filter produce, place and track orders, message farmers, and review completed orders.
-- Farmers can publish, edit, pause, resume, and remove their own listings, advance incoming orders, message buyers, and submit farm details for review.
-- Buyers can report a product with a reason and details; administrators can review, resolve, or dismiss reports.
-- Administrators can approve or reject verification submissions, inspect activity, and moderate reviews.
+- Farmers can publish, edit, pause, resume, and remove their own listings, including quality grade, harvest date, availability end date, and an optional HTTPS product image. Advance incoming orders, message buyers, and submit farm details for review.
+- Buyers can view each farmer's approved farm-verification status, published ratings, and completed-order count; open a farmer profile, contact a grower, and report a product or farmer with a reason and details.
+- Administrators can review and manage products and member accounts, approve or reject farm-detail submissions, inspect activity, moderate reviews, and resolve or dismiss reports.
 - English and Tamil are available throughout the interface; the choice is saved locally and INR values use locale-aware formatting.
 - Orders follow explicit status transitions. Settlement is agreed directly; this MVP does not collect payments.
-- Product cards may show illustrative sample price references. They are not live market prices; the crop-price and weather panels remain unavailable until real providers are configured.
+- Product cards show illustrative sample price references and the difference from a farmer's asking price. They are not live market prices; the crop-price and weather panels remain unavailable until real providers are configured. Only approved farm details earn the verification badge; it does not claim that identity or mobile-number checks have been completed.
 
 ## Database and release
 

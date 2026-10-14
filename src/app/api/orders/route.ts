@@ -25,7 +25,11 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: "Enter a valid quantity." }, { status: 400 });
   try {
     const listing = await prisma.listing.findUnique({ where: { id: parsed.data.listingId } });
-    if (!listing || listing.status !== "ACTIVE") return Response.json({ error: "This listing is no longer available." }, { status: 404 });
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    if (!listing || listing.status !== "ACTIVE" || (listing.availableUntil && listing.availableUntil < today)) {
+      return Response.json({ error: "This listing is no longer available." }, { status: 404 });
+    }
     if (parsed.data.quantity > listing.quantity) return Response.json({ error: "Requested quantity exceeds available stock." }, { status: 400 });
     const order = await prisma.order.create({
       data: { listingId: listing.id, buyerId: user!.id, farmerId: listing.farmerId, quantity: parsed.data.quantity, unitPrice: listing.pricePerKg, total: parsed.data.quantity * listing.pricePerKg, note: parsed.data.note },

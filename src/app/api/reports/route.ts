@@ -26,16 +26,31 @@ export async function POST(request: Request) {
   const { user, response } = await requireRole("BUYER");
   if (response) return response;
   const parsed = z.object({
-    listingId: z.string().min(1),
+    listingId: z.string().min(1).optional(),
+    farmerId: z.string().min(1).optional(),
     reason: z.enum(reportReasons),
     details: z.string().trim().max(1200).optional(),
-  }).safeParse(await request.json().catch(() => null));
+  }).refine((data) => Boolean(data.listingId || data.farmerId)).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Choose a reason and try again." }, { status: 400 });
   try {
-    const listing = await prisma.listing.findUnique({ where: { id: parsed.data.listingId }, select: { farmerId: true } });
-    if (!listing) return Response.json({ error: "Product not found." }, { status: 404 });
+    const listing = parsed.data.listingId
+      ? await prisma.listing.findUnique({ where: { id: parsed.data.listingId }, select: { farmerId: true } })
+      : null;
+    if (parsed.data.listingId && !listing) return Response.json({ error: "Product not found." }, { status: 404 });
+    if (parsed.data.farmerId && !await prisma.user.findFirst({ where: { id: parsed.data.farmerId, role: "FARMER" }, select: { id: true } })) {
+      return Response.json({ error: "Farmer not found." }, { status: 404 });
+    }
+    if (listing && parsed.data.farmerId && listing.farmerId !== parsed.data.farmerId) {
+      return Response.json({ error: "The product and farmer do not match." }, { status: 400 });
+    }
     const report = await prisma.report.create({
-      data: { ...parsed.data, reporterId: user!.id, reportedFarmerId: listing.farmerId },
+      data: {
+        ...(parsed.data.listingId ? { listingId: parsed.data.listingId } : {}),
+        reason: parsed.data.reason,
+        details: parsed.data.details,
+        reporterId: user!.id,
+        reportedFarmerId: listing?.farmerId ?? parsed.data.farmerId,
+      },
     });
     return Response.json({ report }, { status: 201 });
   } catch {
