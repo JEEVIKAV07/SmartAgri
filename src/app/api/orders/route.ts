@@ -81,7 +81,7 @@ export async function PATCH(request: Request) {
 
       if (parsed.data.paymentAction) {
         const canMarkPaid = parsed.data.paymentAction === "MARK_PAID"
-          && user.role === "BUYER"
+          && ["BUYER", "FARMER"].includes(user.role)
           && order.buyerId === user.id
           && canBuyerMarkPayment(order);
         const canConfirmPayment = parsed.data.paymentAction === "CONFIRM_PAYMENT"
@@ -111,7 +111,7 @@ export async function PATCH(request: Request) {
         return { error: "This order cannot be cancelled after payment was marked. Coordinate any refund directly with the other party.", status: 409 } as const;
       }
       const isAllowedParty = (user.role === "FARMER" && order.farmerId === user.id && nextStatus !== "COMPLETED")
-        || (user.role === "BUYER" && order.buyerId === user.id && ["CANCELLED", "COMPLETED"].includes(nextStatus));
+        || (["BUYER", "FARMER"].includes(user.role) && order.buyerId === user.id && ["CANCELLED", "COMPLETED"].includes(nextStatus));
       if (user.role !== "ADMIN" && !isAllowedParty) {
         return { error: "You do not have permission to update this order.", status: 403 } as const;
       }
