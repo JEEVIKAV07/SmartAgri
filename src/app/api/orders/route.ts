@@ -44,6 +44,18 @@ export async function POST(request: Request) {
       if (parsed.data.quantity > listing.quantity) {
         return { error: "Requested quantity exceeds available stock.", status: 400 } as const;
       }
+      const reserved = await tx.listing.updateMany({
+        where: {
+          id: listing.id,
+          status: "ACTIVE",
+          quantity: { gte: parsed.data.quantity },
+          OR: [{ availableUntil: null }, { availableUntil: { gte: today } }],
+        },
+        data: { quantity: { decrement: parsed.data.quantity } },
+      });
+      if (reserved.count !== 1) {
+        return { error: "This listing is no longer available or has insufficient stock.", status: 409 } as const;
+      }
       const order = await tx.order.create({
         data: {
           listingId: listing.id,
