@@ -7,7 +7,7 @@ import {
   Pencil, Plus, Search, Send, ShieldCheck, ShoppingBasket, Sprout, Star, Sun, Trash2, Users, X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { messages, type Locale } from "@/lib/i18n";
+import { favouriteMessages, messages, type Locale } from "@/lib/i18n";
 
 type Role = "BUYER" | "FARMER" | "ADMIN";
 type View = "market" | "weather" | "orders" | "messages" | "admin" | "reports" | "people" | "help";
@@ -68,6 +68,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [cropFilter, setCropFilter] = useState("All crops");
   const [sortLow, setSortLow] = useState(false);
+  const [showFavourites, setShowFavourites] = useState(false);
   const [weather, setWeather] = useState<WeatherReport | null>(null);
   const [weatherError, setWeatherError] = useState("");
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -102,6 +103,7 @@ export default function Home() {
   const [reviews, setReviews] = useState<Array<{ id: string; name: string; crop: string; text: string; rating: number; status: "PENDING" | "PUBLISHED" | "HIDDEN" }>>([{ id: "review-1", name: "Anbu Stores", crop: "Paddy", text: "Clean grain and the pickup was right on time.", rating: 5, status: "PENDING" }]);
   const [reports, setReports] = useState<ProductReport[]>([]);
   const t = messages[locale];
+  const favouriteText = favouriteMessages[locale];
 
   const loadWeather = useCallback(async (location: string) => {
     setWeatherLoading(true);
@@ -338,10 +340,11 @@ export default function Home() {
 
   const visibleListings = useMemo(() => {
     const found = listings.filter((listing) => listing.status === "ACTIVE" || (listing.status === "PAUSED" && role === "FARMER" && listing.farmer === (session?.name ?? "Malar Selvan")))
+      .filter((listing) => !showFavourites || favoriteListingIds.includes(listing.id))
       .filter((listing) => cropFilter === "All crops" || listing.crop === cropFilter)
       .filter((listing) => `${listing.crop} ${listing.variety} ${listing.place} ${listing.farmer}`.toLowerCase().includes(query.toLowerCase()));
     return sortLow ? [...found].sort((a, b) => a.price - b.price) : found;
-  }, [cropFilter, listings, query, role, session?.name, sortLow]);
+  }, [cropFilter, favoriteListingIds, listings, query, role, session?.name, showFavourites, sortLow]);
 
   function switchLocale(next: Locale) {
     setLocale(next);
@@ -815,7 +818,7 @@ export default function Home() {
             <section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line" />{t.goodMorning}</div><h1>{role === "FARMER" ? t.farmerGreeting : role === "ADMIN" ? t.adminGreeting : t.buyerGreeting}</h1><p>{role === "FARMER" ? t.farmerSubhead : role === "ADMIN" ? t.adminSubhead : t.buyerSubhead}</p></div><div className="welcome-date"><span>{t.today}</span><b>{new Intl.DateTimeFormat(locale === "ta" ? "ta-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</b><small>{t.coimbatoreRegion}</small></div></section>
             <section className="insight-row" aria-label={t.marketInsights}><div className="insight-card weather-insight"><span className="insight-icon"><CloudSun size={19} /></span><div><small>{`${locale === "ta" ? "வானிலை" : "Weather"} · ${weather?.location ?? weatherLocation}`}</small><b>{weather ? `${Math.round(weather.current.temperatureC)}°C · ${weather.current.condition}` : weatherLoading ? (locale === "ta" ? "ஏற்றுகிறது…" : "Loading forecast…") : locale === "ta" ? "நேரடி வானிலை கிடைக்கவில்லை" : "Live weather unavailable"}</b><span>{weather ? `${locale === "ta" ? "மழை வாய்ப்பு" : "Rain chance"}: ${weather.forecast[0]?.chanceOfRain ?? 0}% · ${weather.current.humidity}% ${locale === "ta" ? "ஈரப்பதம்" : "humidity"}` : weatherError || (locale === "ta" ? "இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்" : "Check your connection or retry")}</span></div><button className="insight-state insight-link" onClick={() => chooseView("weather")}>{locale === "ta" ? "அறிக்கை" : "View report"}</button>{weatherError && <button className="insight-state insight-link" onClick={() => void loadWeather(weatherLocation)}>{locale === "ta" ? "மீண்டும்" : "Retry"}</button>}</div><div className="insight-note"><span className="note-sun"><Sun size={17} /></span><div><b>{t.planPickup}</b><span>{t.marketplaceAvailable}</span></div><ArrowRight size={16} /></div></section>
             <section className="section-head listing-section-head"><div><div className="eyebrow"><span className="eyebrow-line" />{role === "FARMER" ? t.yourNetwork : t.freshFromFarm}</div><h2>{role === "FARMER" ? (locale === "ta" ? "எனது விளைபொருட்கள்" : "My products") : t.findYourHarvest}</h2></div>{role === "FARMER" ? <button className="primary-button" onClick={openCreateListing}><Plus size={17} />{t.addListing}</button> : role === "BUYER" ? <div className="market-actions"><button className="text-button" onClick={() => setSortLow((value) => !value)}><ArrowDownUp size={16} />{sortLow ? t.priceLowHigh : t.sortByPrice}</button><button className="text-button" onClick={() => visibleListings[0] && openReport(visibleListings[0])}><Flag size={15} />{locale === "ta" ? "விளைபொருளைப் புகாரளி" : "Report product"}</button></div> : null}</section>
-            <section className="market-tools" aria-label={t.marketFilters}><label className="search-field"><Search size={17} /><input aria-label={t.searchProduce} placeholder={t.searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd></label><label className="filter-field"><Filter size={16} /><select aria-label={t.filterByCrop} value={cropFilter} onChange={(event) => setCropFilter(event.target.value)}><option>All crops</option><option>Tomato</option><option>Banana</option><option>Paddy</option><option>Onion</option></select><ChevronDown size={14} /></label><span className="result-count">{visibleListings.length} {t.availableLots}</span></section>
+            <section className="market-tools" aria-label={t.marketFilters}><label className="search-field"><Search size={17} /><input aria-label={t.searchProduce} placeholder={t.searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd></label><label className="filter-field"><Filter size={16} /><select aria-label={t.filterByCrop} value={cropFilter} onChange={(event) => setCropFilter(event.target.value)}><option>All crops</option><option>Tomato</option><option>Banana</option><option>Paddy</option><option>Onion</option></select><ChevronDown size={14} /></label><button className={`favourites-filter ${showFavourites ? "favourites-filter-active" : ""}`} aria-pressed={showFavourites} onClick={() => setShowFavourites((current) => !current)}><Star size={15} fill={showFavourites ? "currentColor" : "none"} />{showFavourites ? favouriteText.showAllProducts : favouriteText.favouriteProducts}</button><span className="result-count">{visibleListings.length} {t.availableLots}</span></section>
             <section className="listing-grid" aria-label={t.produceListings}>
               {visibleListings.map((listing) => {
                 const isOwner = role === "FARMER" && listing.farmerTrust.id === session?.id;
@@ -846,7 +849,7 @@ export default function Home() {
                   </div>
                 </article>;
               })}
-              {visibleListings.length === 0 && <div className="empty-state"><Search size={25} /><b>{t.noListings}</b><span>{query || cropFilter !== "All crops" ? t.tryAnotherSearch : locale === "ta" ? "புதிய விளைபொருட்களை விவசாயிகள் விரைவில் சேர்ப்பார்கள்." : "Farmers can add new products here whenever they are ready."}</span>{role === "FARMER" && <button className="primary-button" onClick={openCreateListing}><Plus size={16} />{t.addListing}</button>}</div>}
+              {visibleListings.length === 0 && <div className="empty-state"><Search size={25} /><b>{showFavourites ? favouriteText.noFavouriteProducts : t.noListings}</b><span>{showFavourites ? favouriteText.addFavouritesHint : query || cropFilter !== "All crops" ? t.tryAnotherSearch : locale === "ta" ? "புதிய விளைபொருட்களை விவசாயிகள் விரைவில் சேர்ப்பார்கள்." : "Farmers can add new products here whenever they are ready."}</span>{role === "FARMER" && !showFavourites && <button className="primary-button" onClick={openCreateListing}><Plus size={16} />{t.addListing}</button>}</div>}
             </section>
             <div className="source-note"><span className="source-dot" />{locale === "ta" ? "பட்டியலிடும்போது விவசாயி விளைபொருள் படத்தைப் பதிவேற்றுவார்." : "Farmers upload the product photo when creating a listing."}</div>
           </>}

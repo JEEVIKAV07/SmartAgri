@@ -23,7 +23,7 @@ Without PostgreSQL, the app opens in an explicitly labeled demo preview. Preview
 ## Workflows
 
 - Buyers can search and filter produce, place and track orders, message farmers, and review completed orders.
-- Buyers and farmers can add listings to browser-stored favourites; favourites are kept separate for each signed-in account.
+- Buyers and farmers can add listings to browser-stored favourites and use a separate marketplace button to view them; favourites are kept separate for each signed-in account.
 - Farmers can publish, edit, pause, resume, and remove their own listings, including a required JPEG, PNG, or WebP product photo (up to 5 MB), quality grade, harvest date, and availability end date. Advance, cancel, dispatch, and coordinate pickup for orders.
 - Orders use cash on pickup. Buyers mark when they have handed over cash, then farmers confirm receipt; both parties see whether payment is complete or incomplete.
 - Pickup confirmations are shared in both parties' order lists and refresh automatically. Buyers see reports they submitted, farmers see reports about them, and administrators can review and resolve all reports.
