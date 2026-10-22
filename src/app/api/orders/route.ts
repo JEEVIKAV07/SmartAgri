@@ -129,13 +129,6 @@ export async function PATCH(request: Request) {
       }
 
       await transitionOrderWithInventory({
-        reserveStock: async (listingId, quantity) => {
-          const result = await tx.listing.updateMany({
-            where: { id: listingId, quantity: { gte: quantity } },
-            data: { quantity: { decrement: quantity } },
-          });
-          return result.count === 1;
-        },
         releaseStock: async (listingId, quantity) => {
           await tx.listing.update({ where: { id: listingId }, data: { quantity: { increment: quantity } } });
         },
@@ -154,11 +147,9 @@ export async function PATCH(request: Request) {
     return Response.json(result);
   } catch (error) {
     if (error instanceof OrderTransitionError) {
-      const message = error.reason === "INSUFFICIENT_STOCK"
-        ? "This order cannot be accepted because the requested quantity is no longer available."
-        : error.reason === "CONCURRENT_UPDATE"
-          ? "This order changed while you were updating it. Refresh and try again."
-          : "This order cannot make that status transition.";
+      const message = error.reason === "CONCURRENT_UPDATE"
+        ? "This order changed while you were updating it. Refresh and try again."
+        : "This order cannot make that status transition.";
       return Response.json({ error: message }, { status: 409 });
     }
     return Response.json({ error: "Could not update order." }, { status: 503 });
