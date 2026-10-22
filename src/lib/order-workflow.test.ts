@@ -28,12 +28,6 @@ describe("order inventory transitions", () => {
     let available = stock;
     const calls: string[] = [];
     const operations = {
-      reserveStock: async (listingId: string, quantity: number) => {
-        calls.push(`reserve:${listingId}:${quantity}`);
-        if (available < quantity) return false;
-        available -= quantity;
-        return true;
-      },
       releaseStock: async (listingId: string, quantity: number) => {
         calls.push(`release:${listingId}:${quantity}`);
         available += quantity;
@@ -46,23 +40,22 @@ describe("order inventory transitions", () => {
     return { operations, calls, get available() { return available; } };
   }
 
-  it("reserves available stock when a farmer accepts an order", async () => {
+  it("does not reserve stock again when a farmer accepts an order", async () => {
     const state = createOperations(6);
 
     await transitionOrderWithInventory(state.operations, order, "ACCEPTED");
 
-    expect(state.available).toBe(2);
-    expect(state.calls).toEqual(["reserve:listing-1:4", "status:order-1:PLACED:ACCEPTED"]);
+    expect(state.available).toBe(6);
+    expect(state.calls).toEqual(["status:order-1:PLACED:ACCEPTED"]);
   });
 
-  it("does not accept an order when stock has already been consumed", async () => {
-    const state = createOperations(3);
+  it("releases stock when a placed order is cancelled", async () => {
+    const state = createOperations(2);
 
-    await expect(transitionOrderWithInventory(state.operations, order, "ACCEPTED"))
-      .rejects.toMatchObject({ reason: "INSUFFICIENT_STOCK" });
+    await transitionOrderWithInventory(state.operations, order, "CANCELLED");
 
-    expect(state.available).toBe(3);
-    expect(state.calls).toEqual(["reserve:listing-1:4"]);
+    expect(state.available).toBe(6);
+    expect(state.calls).toEqual(["release:listing-1:4", "status:order-1:PLACED:CANCELLED"]);
   });
 
   it("releases reserved stock when an accepted order is cancelled", async () => {
@@ -72,15 +65,6 @@ describe("order inventory transitions", () => {
 
     expect(state.available).toBe(6);
     expect(state.calls).toEqual(["release:listing-1:4", "status:order-1:ACCEPTED:CANCELLED"]);
-  });
-
-  it("does not release stock when an unaccepted order is cancelled", async () => {
-    const state = createOperations(6);
-
-    await transitionOrderWithInventory(state.operations, order, "CANCELLED");
-
-    expect(state.available).toBe(6);
-    expect(state.calls).toEqual(["status:order-1:PLACED:CANCELLED"]);
   });
 
   it("signals stale updates so the enclosing transaction can roll back inventory changes", async () => {
