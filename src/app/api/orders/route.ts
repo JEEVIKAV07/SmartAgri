@@ -9,7 +9,9 @@ export async function GET() {
   if (response) return response;
   try {
     const orders = await prisma.order.findMany({
-      where: user!.role === "ADMIN" ? {} : user!.role === "FARMER" ? { farmerId: user!.id } : { buyerId: user!.id },
+      where: user!.role === "ADMIN" ? {} : user!.role === "FARMER"
+        ? { OR: [{ farmerId: user!.id }, { buyerId: user!.id }] }
+        : { buyerId: user!.id },
       include: { listing: true, buyer: { select: { id: true, name: true } }, farmer: { select: { id: true, name: true } } },
       orderBy: { createdAt: "desc" },
     });
@@ -20,7 +22,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const { user, response } = await requireRole("BUYER");
+  const { user, response } = await requireRole("BUYER", "FARMER");
   if (response) return response;
   const parsed = z.object({
     listingId: z.string().min(1),
@@ -35,6 +37,9 @@ export async function POST(request: Request) {
       today.setUTCHours(0, 0, 0, 0);
       if (!listing || listing.status !== "ACTIVE" || (listing.availableUntil && listing.availableUntil < today)) {
         return { error: "This listing is no longer available.", status: 404 } as const;
+      }
+      if (listing.farmerId === user!.id) {
+        return { error: "You cannot place an order on your own listing.", status: 400 } as const;
       }
       if (parsed.data.quantity > listing.quantity) {
         return { error: "Requested quantity exceeds available stock.", status: 400 } as const;
