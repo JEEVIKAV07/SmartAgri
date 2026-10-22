@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canTransitionOrder } from "./order-workflow";
+import { canTransitionOrder, transitionOrderWithInventory, type OrderStatus } from "./order-workflow";
 
 describe("order status transitions", () => {
   it("allows the forward fulfillment path", () => {
@@ -18,5 +18,76 @@ describe("order status transitions", () => {
   it("rejects skipped or backwards fulfillment steps", () => {
     expect(canTransitionOrder("PLACED", "READY")).toBe(false);
     expect(canTransitionOrder("READY", "ACCEPTED")).toBe(false);
+  });
+});
+
+describe("order inventory transitions", () => {
+  const order = { id: "order-1", listingId: "listing-1", quantity: 4, status: "PLACED" as OrderStatus };
+
+  function createOperations(stock: number) {
+    let available = stock;
+    const calls: string[] = [];
+    const operations = {
+      reserveStock: async (listingId: string, quantity: number) => {
+        calls.push(`reserve:${listingId}:${quantity}`);
+        if (available < quantity) return false;
+        available -= quantity;
+        return true;
+      },
+      releaseStock: async (listingId: string, quantity: number) => {
+        calls.push(`release:${listingId}:${quantity}`);
+        available += quantity;
+      },
+      updateStatus: async (orderId: string, from: OrderStatus, to: OrderStatus) => {
+        calls.push(`status:${orderId}:${from}:${to}`);
+        return true;
+      },
+    };
+    return { operations, calls, get available() { return available; } };
+  }
+
+  it("reserves available stock when a farmer accepts an order", async () => {
+    const state = createOperations(6);
+
+    await transitionOrderWithInventory(state.operations, order, "ACCEPTED");
+
+    expect(state.available).toBe(2);
+    expect(state.calls).toEqual(["reserve:listing-1:4", "status:order-1:PLACED:ACCEPTED"]);
+  });
+
+  it("does not accept an order when stock has already been consumed", async () => {
+    const state = createOperations(3);
+
+    await expect(transitionOrderWithInventory(state.operations, order, "ACCEPTED"))
+      .rejects.toMatchObject({ reason: "INSUFFICIENT_STOCK" });
+
+    expect(state.available).toBe(3);
+    expect(state.calls).toEqual(["reserve:listing-1:4"]);
+  });
+
+  it("releases reserved stock when an accepted order is cancelled", async () => {
+    const state = createOperations(2);
+
+    await transitionOrderWithInventory(state.operations, { ...order, status: "ACCEPTED" }, "CANCELLED");
+
+    expect(state.available).toBe(6);
+    expect(state.calls).toEqual(["release:listing-1:4", "status:order-1:ACCEPTED:CANCELLED"]);
+  });
+
+  it("does not release stock when an unaccepted order is cancelled", async () => {
+    const state = createOperations(6);
+
+    await transitionOrderWithInventory(state.operations, order, "CANCELLED");
+
+    expect(state.available).toBe(6);
+    expect(state.calls).toEqual(["status:order-1:PLACED:CANCELLED"]);
+  });
+
+  it("signals stale updates so the enclosing transaction can roll back inventory changes", async () => {
+    const state = createOperations(6);
+    state.operations.updateStatus = async () => false;
+
+    await expect(transitionOrderWithInventory(state.operations, order, "ACCEPTED"))
+      .rejects.toMatchObject({ reason: "CONCURRENT_UPDATE" });
   });
 });

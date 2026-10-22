@@ -1,5 +1,25 @@
 export type OrderStatus = "PLACED" | "ACCEPTED" | "READY" | "COMPLETED" | "CANCELLED";
 
+type OrderToTransition = {
+  id: string;
+  listingId: string;
+  quantity: number;
+  status: OrderStatus;
+};
+
+type InventoryOperations = {
+  reserveStock: (listingId: string, quantity: number) => Promise<boolean>;
+  releaseStock: (listingId: string, quantity: number) => Promise<void>;
+  updateStatus: (orderId: string, from: OrderStatus, to: OrderStatus) => Promise<boolean>;
+};
+
+export class OrderTransitionError extends Error {
+  constructor(readonly reason: "INVALID_TRANSITION" | "INSUFFICIENT_STOCK" | "CONCURRENT_UPDATE") {
+    super(reason);
+    this.name = "OrderTransitionError";
+  }
+}
+
 const transitions: Record<OrderStatus, OrderStatus[]> = {
   PLACED: ["ACCEPTED", "CANCELLED"],
   ACCEPTED: ["READY", "CANCELLED"],
@@ -10,4 +30,26 @@ const transitions: Record<OrderStatus, OrderStatus[]> = {
 
 export function canTransitionOrder(from: OrderStatus, to: OrderStatus) {
   return transitions[from].includes(to);
+}
+
+export async function transitionOrderWithInventory(
+  operations: InventoryOperations,
+  order: OrderToTransition,
+  nextStatus: OrderStatus,
+) {
+  if (!canTransitionOrder(order.status, nextStatus)) {
+    throw new OrderTransitionError("INVALID_TRANSITION");
+  }
+
+  if (nextStatus === "ACCEPTED" && !(await operations.reserveStock(order.listingId, order.quantity))) {
+    throw new OrderTransitionError("INSUFFICIENT_STOCK");
+  }
+
+  if (nextStatus === "CANCELLED" && order.status !== "PLACED") {
+    await operations.releaseStock(order.listingId, order.quantity);
+  }
+
+  if (!(await operations.updateStatus(order.id, order.status, nextStatus))) {
+    throw new OrderTransitionError("CONCURRENT_UPDATE");
+  }
 }

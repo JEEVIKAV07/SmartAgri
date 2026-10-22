@@ -2,6 +2,16 @@ import { z } from "zod";
 import { getCurrentUser, requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+const persistedProductImage = z.string().refine(
+  (value) => /^\/api\/product-images\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(value)
+    || (value.startsWith("https://") && z.url().safeParse(value).success),
+  "Use an uploaded product image or an HTTPS image URL.",
+);
+const uploadedProductImage = z.string().regex(
+  /^\/api\/product-images\/[0-9a-f-]{36}\.(jpg|png|webp)$/,
+  "Upload a product image before publishing the listing.",
+);
+
 const listingInput = z.object({
   crop: z.string().trim().min(2).max(80),
   variety: z.string().trim().max(80).optional(),
@@ -12,7 +22,7 @@ const listingInput = z.object({
   location: z.string().trim().min(2).max(120),
   harvestDate: z.string().date().nullable().optional(),
   availableUntil: z.string().date().nullable().optional(),
-  imageUrl: z.string().url().startsWith("https://").nullable().optional(),
+  imageUrl: uploadedProductImage,
 }).refine((data) => !data.harvestDate || !data.availableUntil || data.harvestDate <= data.availableUntil, {
   message: "The availability date cannot be earlier than the harvest date.",
 });
@@ -51,13 +61,6 @@ export async function GET(request: Request) {
           select: {
             id: true,
             name: true,
-            village: true,
-            verifications: {
-              where: { status: "APPROVED" },
-              select: { farmName: true, district: true },
-              orderBy: { reviewedAt: "desc" },
-              take: 1,
-            },
             farmerReviews: {
               where: { status: "PUBLISHED" },
               select: { rating: true },
@@ -114,7 +117,7 @@ export async function PATCH(request: Request) {
     location: z.string().trim().min(2).max(120).optional(),
     harvestDate: z.string().date().nullable().optional(),
     availableUntil: z.string().date().nullable().optional(),
-    imageUrl: z.string().url().startsWith("https://").nullable().optional(),
+    imageUrl: persistedProductImage.nullable().optional(),
   }).refine(({ status, ...details }) => status !== undefined || Object.values(details).some((value) => value !== undefined)).safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Invalid listing update." }, { status: 400 });
   try {

@@ -5,13 +5,18 @@ import { prisma } from "@/lib/prisma";
 const reportReasons = ["FAKE_PRODUCT", "INCORRECT_INFORMATION", "MISLEADING_IMAGE", "POOR_QUALITY", "SUSPICIOUS_FARMER", "PAYMENT_ISSUE", "OTHER"] as const;
 
 export async function GET() {
-  const { response } = await requireRole("ADMIN");
+  const { user, response } = await requireRole("ADMIN", "BUYER", "FARMER");
   if (response) return response;
   try {
     const reports = await prisma.report.findMany({
+      where: user!.role === "ADMIN"
+        ? {}
+        : user!.role === "FARMER"
+          ? { reportedFarmerId: user!.id }
+          : { reporterId: user!.id },
       include: {
-        reporter: { select: { name: true } },
-        reportedFarmer: { select: { name: true } },
+        reporter: { select: { id: true, name: true } },
+        reportedFarmer: { select: { id: true, name: true } },
         listing: { select: { crop: true, location: true } },
       },
       orderBy: { createdAt: "desc" },

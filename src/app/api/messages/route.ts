@@ -10,10 +10,11 @@ export async function GET(request: Request) {
   try {
     const conversations = await prisma.conversation.findMany({
       where: { OR: [{ buyerId: user.id }, { farmerId: user.id }] },
-      include: { listing: true, buyer: { select: { id: true, name: true } }, farmer: { select: { id: true, name: true } }, messages: { orderBy: { createdAt: "asc" }, take: 100 } },
+      include: { listing: true, buyer: { select: { id: true, name: true } }, farmer: { select: { id: true, name: true } }, messages: { orderBy: { createdAt: "desc" }, take: 100 } },
       orderBy: { createdAt: "desc" },
     });
-    return Response.json({ conversations: conversationId ? conversations.filter((item) => item.id === conversationId) : conversations });
+    const selectedConversations = conversationId ? conversations.filter((item) => item.id === conversationId) : conversations;
+    return Response.json({ conversations: selectedConversations.map((item) => ({ ...item, messages: item.messages.reverse() })) });
   } catch {
     return Response.json({ error: "Database unavailable." }, { status: 503 });
   }
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   try {
     const listing = await prisma.listing.findUnique({ where: { id: parsed.data.listingId }, select: { farmerId: true } });
     if (!listing) return Response.json({ error: "Listing not found." }, { status: 404 });
-    let conversation = parsed.data.conversationId
+    const conversation = parsed.data.conversationId
       ? await prisma.conversation.findFirst({ where: { id: parsed.data.conversationId, OR: [{ buyerId: user!.id }, { farmerId: user!.id }] } })
       : user!.role === "BUYER"
         ? await prisma.conversation.upsert({ where: { id: `${user!.id}:${parsed.data.listingId}` }, create: { id: `${user!.id}:${parsed.data.listingId}`, buyerId: user!.id, farmerId: listing.farmerId, listingId: parsed.data.listingId }, update: {} })

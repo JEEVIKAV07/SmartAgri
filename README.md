@@ -1,6 +1,6 @@
 # SmartAgri | Vayal Connect
 
-Bilingual Tamil-English marketplace connecting Tamil Nadu farmers and buyers, with product management, price references, orders, messaging, farmer verification, reviews, and report moderation. Built with Next.js App Router, React, TypeScript, PostgreSQL, and Prisma.
+Bilingual Tamil-English marketplace connecting Tamil Nadu farmers and buyers, with product management, orders, messaging, reviews, weather reports, and report moderation. Built with Next.js App Router, React, TypeScript, PostgreSQL, and Prisma.
 
 ## Local setup
 
@@ -16,25 +16,30 @@ npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000. The seed provides `farmer@vayal.test`, `buyer@vayal.test`, and `admin@vayal.test`, all with the default local password `Harvest!2026`. Set `DEMO_PASSWORD` before seeding to override it. These synthetic accounts are for local development only.
+Open http://localhost:3000. The seed provides `farmer@vayal.test`, `buyer@vayal.test`, `admin@vayal.test`, `kannan@vayal.test`, `murugan@vayal.test`, and `thenmozhi@vayal.test`, all with the default local password `Harvest!2026`. Set `DEMO_PASSWORD` before seeding to override it. These synthetic accounts are for local development only.
 
 Without PostgreSQL, the app opens in an explicitly labeled demo preview. Preview changes live only in browser memory. Signed-in actions use the PostgreSQL APIs.
 
 ## Workflows
 
 - Buyers can search and filter produce, place and track orders, message farmers, and review completed orders.
-- Farmers can publish, edit, pause, resume, and remove their own listings, including quality grade, harvest date, availability end date, and an optional HTTPS product image. Advance incoming orders, message buyers, and submit farm details for review.
-- Buyers can view each farmer's approved farm-verification status, published ratings, and completed-order count; open a farmer profile, contact a grower, and report a product or farmer with a reason and details.
-- Administrators can review and manage products and member accounts, approve or reject farm-detail submissions, inspect activity, moderate reviews, and resolve or dismiss reports.
+- Farmers can publish, edit, pause, resume, and remove their own listings, including a required JPEG, PNG, or WebP product photo (up to 5 MB), quality grade, harvest date, and availability end date. Advance, cancel, dispatch, and coordinate pickup for orders.
+- Orders use cash on pickup. Buyers mark when they have handed over cash, then farmers confirm receipt; both parties see whether payment is complete or incomplete.
+- Pickup confirmations are shared in both parties' order lists and refresh automatically. Buyers see reports they submitted, farmers see reports about them, and administrators can review and resolve all reports.
+- Buyers can view published ratings and completed-order counts; open a farmer profile, contact a grower, and report a product or farmer with a reason and details.
+- Administrators can review and manage products and member accounts, inspect activity, moderate reviews, and resolve or dismiss reports.
 - English and Tamil are available throughout the interface; the choice is saved locally and INR values use locale-aware formatting.
-- Orders follow explicit status transitions. Settlement is agreed directly; this MVP does not collect payments.
-- Product cards show illustrative sample price references and the difference from a farmer's asking price. They are not live market prices; the crop-price and weather panels remain unavailable until real providers are configured. Only approved farm details earn the verification badge; it does not claim that identity or mobile-number checks have been completed.
+- Buyers and farmers can create accounts, sign in, and exchange persistent messages in a live-refreshing, chat-style inbox. Account and message storage requires PostgreSQL.
+- Orders follow explicit status transitions. Cash payment confirmations are recorded for both parties; this MVP does not collect payment.
+- Product quantity is reserved atomically when a farmer accepts an order. If an accepted or ready order is cancelled, its quantity is returned to stock; unaccepted cancellations do not affect inventory.
+- Current weather and a three-day forecast are fetched server-side from Open-Meteo, including location search, and do not require an API key. Market-price features are deferred and are not shown in the application interface.
+- New listings start with an empty marketplace. Uploaded product images are stored under `.data/product-images`; use persistent object storage instead when deploying to an environment with ephemeral local filesystems.
 
 ## Database and release
 
 The PostgreSQL models are in `prisma/schema.prisma`. `npm run db:migrate` creates and applies local development migrations. Commit generated migration files for production releases. Run `npm test`, `npm run lint`, and `npm run build` before release.
 
-Verification stores a private document reference only. The MVP does not upload files; configure private object storage and access controls before accepting real identity or farm documents. The database rate limit uses hashed client addresses; configure the deployment proxy to set trusted forwarding headers.This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+The database rate limit uses hashed client addresses; configure the deployment proxy to set trusted forwarding headers. This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 

@@ -9,9 +9,11 @@ const credentials = z.object({ email: z.string().email().max(254), password: z.s
 export async function POST(request: Request) {
   const parsed = credentials.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Enter a valid email and password." }, { status: 400 });
-  if (!(await checkRateLimit(request, "login", 10, 60_000))) return Response.json({ error: "Too many sign-in attempts. Try again in a minute." }, { status: 429 });
 
   try {
+    if (!(await checkRateLimit(request, "login", 10, 60_000))) {
+      return Response.json({ error: "Too many sign-in attempts. Try again in a minute." }, { status: 429 });
+    }
     const user = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
     if (!user?.isActive || !(await compare(parsed.data.password, user.passwordHash))) {
       return Response.json({ error: "Email or password is incorrect." }, { status: 401 });
