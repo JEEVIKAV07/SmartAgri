@@ -29,12 +29,28 @@ export async function POST(request: Request) {
   try {
     const listing = await prisma.listing.findUnique({ where: { id: parsed.data.listingId }, select: { farmerId: true } });
     if (!listing) return Response.json({ error: "Listing not found." }, { status: 404 });
+    if (!parsed.data.conversationId && listing.farmerId === user!.id) {
+      return Response.json({ error: "You cannot start a conversation with yourself." }, { status: 400 });
+    }
     const conversation = parsed.data.conversationId
-      ? await prisma.conversation.findFirst({ where: { id: parsed.data.conversationId, OR: [{ buyerId: user!.id }, { farmerId: user!.id }] } })
-      : user!.role === "BUYER"
-        ? await prisma.conversation.upsert({ where: { id: `${user!.id}:${parsed.data.listingId}` }, create: { id: `${user!.id}:${parsed.data.listingId}`, buyerId: user!.id, farmerId: listing.farmerId, listingId: parsed.data.listingId }, update: {} })
-        : await prisma.conversation.findFirst({ where: { listingId: parsed.data.listingId, farmerId: user!.id, buyerId: { not: user!.id } }, orderBy: { createdAt: "desc" } });
-    if (!conversation) return Response.json({ error: "Conversation not found. Start the conversation from a buyer account." }, { status: 404 });
+      ? await prisma.conversation.findFirst({
+        where: {
+          id: parsed.data.conversationId,
+          listingId: parsed.data.listingId,
+          OR: [{ buyerId: user!.id }, { farmerId: user!.id }],
+        },
+      })
+      : await prisma.conversation.upsert({
+        where: { id: `${user!.id}:${parsed.data.listingId}` },
+        create: {
+          id: `${user!.id}:${parsed.data.listingId}`,
+          buyerId: user!.id,
+          farmerId: listing.farmerId,
+          listingId: parsed.data.listingId,
+        },
+        update: {},
+      });
+    if (!conversation) return Response.json({ error: "Conversation not found." }, { status: 404 });
     const message = await prisma.message.create({ data: { conversationId: conversation.id, senderId: user!.id, body: parsed.data.body } });
     return Response.json({ conversationId: conversation.id, message }, { status: 201 });
   } catch {

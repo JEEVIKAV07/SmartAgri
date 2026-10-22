@@ -10,7 +10,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { messages, type Locale } from "@/lib/i18n";
 
 type Role = "BUYER" | "FARMER" | "ADMIN";
-type View = "market" | "weather" | "orders" | "messages" | "admin" | "reports" | "people";
+type View = "market" | "weather" | "orders" | "messages" | "admin" | "reports" | "people" | "help";
 type FarmerTrust = { id: string; completedOrders: number; averageRating: number | null; reviewCount: number };
 type Listing = { id: string; crop: string; variety: string; grade: string; quantity: number; unit: string; price: number; place: string; farmer: string; farmerTrust: FarmerTrust; image: string; tone: string; harvestDate: string | null; availableUntil: string | null; status: "ACTIVE" | "PAUSED" | "REMOVED" };
 type DemoOrder = {
@@ -73,6 +73,7 @@ export default function Home() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherLocation, setWeatherLocation] = useState("Coimbatore");
   const [listings, setListings] = useState(starterListings);
+  const [favoriteListingIds, setFavoriteListingIds] = useState<string[]>([]);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [listingImageFile, setListingImageFile] = useState<File | null>(null);
   const [listingImagePreview, setListingImagePreview] = useState("");
@@ -271,6 +272,28 @@ export default function Home() {
     });
   }, [loadWeather, loadWorkspaceData]);
 
+  useEffect(() => {
+    const storageKey = `smartagri-favourites:${session?.id ?? "guest"}`;
+    const loadFavourites = window.setTimeout(() => {
+      try {
+        const savedFavourites = window.localStorage.getItem(storageKey);
+        if (!savedFavourites) {
+          setFavoriteListingIds([]);
+          return;
+        }
+        const parsed: unknown = JSON.parse(savedFavourites);
+        if (!Array.isArray(parsed) || parsed.some((id) => typeof id !== "string")) {
+          throw new Error("Saved favourites are invalid.");
+        }
+        setFavoriteListingIds(parsed);
+      } catch {
+        setFavoriteListingIds([]);
+        setNotice(locale === "ta" ? "பிடித்தவற்றை ஏற்ற முடியவில்லை." : "Saved favourites could not be loaded.");
+      }
+    }, 0);
+    return () => window.clearTimeout(loadFavourites);
+  }, [locale, session?.id]);
+
   useEffect(() => () => {
     if (listingImagePreview.startsWith("blob:")) URL.revokeObjectURL(listingImagePreview);
   }, [listingImagePreview]);
@@ -324,6 +347,22 @@ export default function Home() {
     setLocale(next);
     document.documentElement.lang = next;
     window.localStorage.setItem("smartagri-locale", next);
+  }
+
+  function toggleFavourite(listing: Listing) {
+    const isFavourite = favoriteListingIds.includes(listing.id);
+    const nextFavourites = isFavourite
+      ? favoriteListingIds.filter((id) => id !== listing.id)
+      : [...favoriteListingIds, listing.id];
+    const storageKey = `smartagri-favourites:${session?.id ?? "guest"}`;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(nextFavourites));
+    } catch {
+      setNotice(locale === "ta" ? "பிடித்தவற்றைச் சேமிக்க முடியவில்லை." : "Favourite could not be saved. Check your browser storage settings.");
+      return;
+    }
+    setFavoriteListingIds(nextFavourites);
+    setNotice(isFavourite ? t.favouriteRemoved : t.favouriteAdded);
   }
 
   async function sendToApi(path: string, body: object, method: "POST" | "PATCH" = "POST") {
@@ -675,6 +714,7 @@ export default function Home() {
     ...(role === "ADMIN" ? [{ id: "admin" as const, label: t.adminReview, icon: ShieldCheck }] : []),
     ...((session || role === "ADMIN") ? [{ id: "reports" as const, label: locale === "ta" ? "புகார்கள்" : "Reports", icon: Flag }] : []),
     ...(role === "ADMIN" ? [{ id: "people" as const, label: locale === "ta" ? "பயனர்கள்" : "People", icon: Users }] : []),
+    { id: "help" as const, label: t.helpCenter, icon: CircleHelp },
   ];
   const isDemo = !session;
   const orderedConversations = [...conversations].sort((left, right) => {
@@ -708,6 +748,45 @@ export default function Home() {
 
         <main className="content-area">
           {view === "people" && <section className="workspace-view"><div className="eyebrow"><span className="eyebrow-line" />{locale === "ta" ? "நிர்வாகக் கட்டுப்பாடு" : "PLATFORM CONTROL"}</div><h1>{locale === "ta" ? "விவசாயிகள் மற்றும் வாங்குபவர்கள்" : "Farmers and buyers"}</h1><p className="view-intro">{locale === "ta" ? "பயனர் கணக்குகளை ஆய்வு செய்து, தேவையானபோது அணுகலை முடக்குங்கள்." : "Review registered farmers and buyers, and suspend or restore account access when needed."}</p><div className="subsection-title"><h2>{locale === "ta" ? "பதிவுசெய்த உறுப்பினர்கள்" : "Registered members"}</h2><span>{users.length}</span></div>{users.length === 0 ? <div className="empty-state"><Users size={24} /><b>{locale === "ta" ? "பயனர்கள் இல்லை" : "No members found"}</b></div> : users.map((user) => <article className="review-item" key={user.id}><span className="review-avatar"><Users size={17} /></span><div className="review-details"><div><b>{user.name}</b><span className={`status ${user.isActive ? "status-approved" : "status-rejected"}`}>{user.isActive ? (locale === "ta" ? "செயலில்" : "Active") : (locale === "ta" ? "இடைநிறுத்தப்பட்டது" : "Suspended")}</span></div><p>{user.email} · {user.role === "FARMER" ? t.farmer : t.buyer}</p></div><button className="row-action" onClick={() => void updateUser(user)}>{user.isActive ? (locale === "ta" ? "அணுகலை இடைநிறுத்து" : "Suspend access") : (locale === "ta" ? "அணுகலை மீட்டமை" : "Restore access")}</button></article>)}</section>}
+          {view === "help" && <section className="workspace-view">
+            <div className="eyebrow"><span className="eyebrow-line" />{locale === "ta" ? "வழிகாட்டி மற்றும் ஆதரவு" : "GUIDES & SUPPORT"}</div>
+            <h1>{locale === "ta" ? "உதவி மையம்" : "Help center"}</h1>
+            <p className="view-intro">{locale === "ta" ? "Vayal Connect-ஐப் பயன்படுத்துவது, ஆர்டர்கள் மற்றும் கட்டணங்கள் குறித்த பதில்களை இங்கே காணலாம்." : "Find answers about using Vayal Connect, managing orders, and confirming cash payments."}</p>
+            <div className="help-grid">
+              <article className="help-card">
+                <span className="help-card-icon"><ShoppingBasket size={18} /></span>
+                <div><h2>{locale === "ta" ? "சந்தை மற்றும் பட்டியல்கள்" : "Marketplace & listings"}</h2>
+                  <details><summary>{locale === "ta" ? "விவசாயியாக எப்படிப் பட்டியலிடுவது?" : "How do I create a farmer listing?"}</summary><p>{locale === "ta" ? "விவசாயி கணக்கில் உள்நுழைந்து சந்தையில் “பட்டியல் சேர்” என்பதைத் தேர்ந்தெடுக்கவும். விளைபொருள் விவரங்கள், அளவு, விலை, இருப்பிடம் மற்றும் JPEG, PNG அல்லது WebP படத்தைச் சேர்த்து வெளியிடவும்." : "Sign in with a farmer account, choose Add listing in the marketplace, then enter the crop details, quantity, price, pickup location, and a JPEG, PNG, or WebP photo."}</p></details>
+                  <details><summary>{locale === "ta" ? "ஒரு விளைபொருளைப் பற்றி எப்படி புகார் செய்வது?" : "How do I report a product or farmer?"}</summary><p>{locale === "ta" ? "சந்தையில் அந்த விளைபொருளின் “Report product” விருப்பத்தைப் பயன்படுத்தவும். புகார் நிர்வாகத்திற்கும் சம்பந்தப்பட்ட விவசாயிக்கும் காட்டப்படும்; உங்கள் Reports பகுதியில் நிலையைப் பார்க்கலாம்." : "Use Report product or Report farmer from the marketplace. The report is visible to the admin team and the farmer concerned; you can track its status in Reports."}</p></details>
+                </div>
+                <button className="help-link" onClick={() => chooseView("market")}>{locale === "ta" ? "சந்தைக்குச் செல்" : "Go to marketplace"}<ArrowRight size={14} /></button>
+              </article>
+              <article className="help-card">
+                <span className="help-card-icon"><ClipboardList size={18} /></span>
+                <div><h2>{locale === "ta" ? "ஆர்டர்கள் மற்றும் கட்டணங்கள்" : "Orders & payments"}</h2>
+                  <details><summary>{locale === "ta" ? "என் ஆர்டரின் நிலையை எங்கே பார்க்கலாம்?" : "Where can I check my order status?"}</summary><p>{locale === "ta" ? "Orders பகுதியில் வாங்குபவர் தனது ஆர்டர்களையும், விவசாயி தனது பட்டியல்களுக்கான ஆர்டர்களையும் பார்க்கலாம். விவசாயி ஆர்டரை ஏற்றுக்கொண்டு, வாங்குபவர் எடுத்துச் செல்லத் தயாராக இருக்கும்போது Dispatch என்பதைத் தேர்வுசெய்வார். வாங்குபவர் எடுத்த பிறகு Confirm pickup அழுத்துவார்; அது விவசாயிக்கும் காட்டப்படும்." : "Open Orders to see orders you placed or, as a farmer, orders for your listings. Farmers accept and dispatch orders as ready for pickup. When the buyer confirms pickup, the farmer sees the completed status too."}</p></details>
+                  <details><summary>{locale === "ta" ? "கட்டணம் எப்படி உறுதிப்படுத்தப்படும்?" : "How is cash payment confirmed?"}</summary><p>{locale === "ta" ? "கட்டணம் பெறும்போது பணமாகச் செலுத்தப்படுகிறது. வாங்குபவர் பணத்தை வழங்கியதாகக் குறிப்பிட்டதும், விவசாயி பணம் கிடைத்ததை உறுதிப்படுத்துவார். இருவருக்கும் கட்டணம் முடிந்தது அல்லது முடியவில்லை என்ற நிலை தெரியும்." : "Payment is cash on pickup. The buyer marks cash as handed over, then the farmer confirms receipt. Both accounts show whether payment is complete or incomplete."}</p></details>
+                </div>
+                <button className="help-link" onClick={() => chooseView("orders")}>{locale === "ta" ? "ஆர்டர்களைக் காண்க" : "Go to orders"}<ArrowRight size={14} /></button>
+              </article>
+              <article className="help-card">
+                <span className="help-card-icon"><MessageCircle size={18} /></span>
+                <div><h2>{locale === "ta" ? "செய்திகள் மற்றும் கணக்கு" : "Messages & account"}</h2>
+                  <details><summary>{locale === "ta" ? "விவசாயியை அல்லது வாங்குபவரை எப்படித் தொடர்புகொள்வது?" : "How do I contact a farmer or buyer?"}</summary><p>{locale === "ta" ? "விளைபொருள் பட்டியலில் Message என்பதைத் தேர்ந்தெடுக்கவும். அனுப்பிய செய்திகளையும் பதில்களையும் Messages பகுதியில் காணலாம்." : "Choose Message on a product listing to start a conversation. Sent messages and replies appear in Messages."}</p></details>
+                  <details><summary>{locale === "ta" ? "என் புகார்கள் எங்கே தெரியும்?" : "Where can I follow a complaint?"}</summary><p>{locale === "ta" ? "உள்நுழைந்த வாங்குபவர் தாம் அளித்த புகார்களை Reports பகுதியில் காணலாம். விவசாயி தமது விளைபொருள் அல்லது கணக்கு தொடர்பான புகார்களை அங்கே பார்க்கலாம்." : "Signed-in buyers see reports they submitted in Reports. Farmers can see complaints about their products or account there."}</p></details>
+                </div>
+                <button className="help-link" onClick={() => chooseView(session ? "messages" : "market")}>{session ? (locale === "ta" ? "செய்திகளுக்குச் செல்" : "Go to messages") : (locale === "ta" ? "கணக்கில் உள்நுழைக" : "Sign in to get started")}<ArrowRight size={14} /></button>
+              </article>
+              <article className="help-card">
+                <span className="help-card-icon"><CloudSun size={18} /></span>
+                <div><h2>{locale === "ta" ? "வானிலை அறிக்கை" : "Weather reports"}</h2>
+                  <details><summary>{locale === "ta" ? "எனது ஊருக்கான வானிலையைப் பார்க்கலாமா?" : "Can I check weather for my location?"}</summary><p>{locale === "ta" ? "Weather report பகுதியில் ஊர் அல்லது இடத்தின் பெயரைத் தேடி தற்போதைய நிலை மற்றும் மூன்று நாள் முன்னறிவிப்பைப் பார்க்கவும்." : "Open Weather report, search for a village or town, and view current conditions with a three-day forecast."}</p></details>
+                </div>
+                <button className="help-link" onClick={() => chooseView("weather")}>{locale === "ta" ? "வானிலைக்குச் செல்" : "Go to weather"}<ArrowRight size={14} /></button>
+              </article>
+            </div>
+            <p className="help-note">{locale === "ta" ? "மேலும் உதவி தேவையா? புகார் விருப்பத்தைப் பயன்படுத்தி நிர்வாகக் குழுவிற்குத் தகவல் தெரிவிக்கவும்." : "Need additional help? Use the report option on a listing to notify the admin team."}</p>
+          </section>}
           {view === "weather" && <section className="workspace-view">
             <div className="eyebrow"><span className="eyebrow-line" />{locale === "ta" ? "பயிர் திட்டமிடலுக்கான நேரடி வானிலை" : "LIVE CONDITIONS FOR FARM PLANNING"}</div>
             <h1>{locale === "ta" ? "வானிலை அறிக்கை" : "Weather report"}</h1>
@@ -739,12 +818,12 @@ export default function Home() {
             <section className="market-tools" aria-label={t.marketFilters}><label className="search-field"><Search size={17} /><input aria-label={t.searchProduce} placeholder={t.searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd></label><label className="filter-field"><Filter size={16} /><select aria-label={t.filterByCrop} value={cropFilter} onChange={(event) => setCropFilter(event.target.value)}><option>All crops</option><option>Tomato</option><option>Banana</option><option>Paddy</option><option>Onion</option></select><ChevronDown size={14} /></label><span className="result-count">{visibleListings.length} {t.availableLots}</span></section>
             <section className="listing-grid" aria-label={t.produceListings}>
               {visibleListings.map((listing) => {
-                const isOwner = role === "FARMER" && listing.farmer === (session?.name ?? "Malar Selvan");
+                const isOwner = role === "FARMER" && listing.farmerTrust.id === session?.id;
                 const canManageListing = isOwner || role === "ADMIN";
                 return <article className="produce-card" key={listing.id}>
                   <div className={`produce-image image-${listing.tone}`} style={{ backgroundImage: `url("${listing.image}")` }}>
                     <span className="fresh-tag"><span />{listing.status === "ACTIVE" ? t.harvestReady : listing.status === "PAUSED" ? (locale === "ta" ? "இடைநிறுத்தப்பட்டது" : "PAUSED") : (locale === "ta" ? "நீக்கப்பட்டது" : "REMOVED")}</span>
-                    <button className="save-button" aria-label={`${t.save} ${listing.crop}`} title={t.save}><Star size={16} /></button>
+                    <button className={`save-button ${favoriteListingIds.includes(listing.id) ? "save-button-active" : ""}`} aria-label={`${favoriteListingIds.includes(listing.id) ? t.removeFavourite : t.addFavourite} ${listing.crop}`} aria-pressed={favoriteListingIds.includes(listing.id)} title={favoriteListingIds.includes(listing.id) ? t.removeFavourite : t.addFavourite} onClick={() => toggleFavourite(listing)}><Star size={16} fill={favoriteListingIds.includes(listing.id) ? "currentColor" : "none"} /></button>
                   </div>
                   <div className="produce-copy">
                     <div className="crop-line">
@@ -882,7 +961,7 @@ export default function Home() {
                 </> : <div className="chat-empty chat-placeholder"><MessageCircle size={30} /><b>{locale === "ta" ? "உரையாடலைத் தேர்ந்தெடுக்கவும்" : "Select a conversation"}</b><span>{locale === "ta" ? "உங்கள் செய்திகள் இங்கே தோன்றும்." : "Your messages will appear here."}</span></div>}
               </div>
             </div>
-            <p className="privacy-note"><ShieldCheck size={15} />{t.messagePrivacy}</p>
+            <p className="privacy-note"><ShieldCheck size={15} />{role === "FARMER" ? (locale === "ta" ? "செய்திகள் உரையாடலில் உள்ளவர்களுக்கு மட்டுமே தெரியும்." : "Messages are visible only to the conversation participants.") : t.messagePrivacy}</p>
           </section>}
 
           {view === "admin" && <section className="workspace-view">
@@ -926,7 +1005,7 @@ export default function Home() {
                   : <span className="muted-cell">{reportLabels[locale][report.status]}</span>}
               </article>)}
           </section>}
-          <footer className="page-footer"><span>© 2026 Vayal Connect</span><span>{t.footerMessage}</span><a href="#help">{t.helpCenter}<ArrowRight size={13} /></a></footer>
+          <footer className="page-footer"><span>© 2026 Vayal Connect</span><span>{t.footerMessage}</span><button type="button" onClick={() => chooseView("help")}>{t.helpCenter}<ArrowRight size={13} /></button></footer>
         </main>
       </div>
 
@@ -980,7 +1059,7 @@ export default function Home() {
         {modal === "farmer" && selectedListing && <><div className="modal-icon"><Sprout size={20} /></div><h2 id="modal-title">{selectedListing.farmer}</h2><p>{locale === "ta" ? "விவசாயி சுயவிவரம்" : "Farmer profile"} · {selectedListing.place}</p>
           <div className="trust-stats"><div><b>{selectedListing.farmerTrust.averageRating === null ? "—" : `${selectedListing.farmerTrust.averageRating} / 5`}</b><span>{locale === "ta" ? "வெளியிடப்பட்ட மதிப்பீடு" : `Published rating · ${selectedListing.farmerTrust.reviewCount} reviews`}</span></div><div><b>{selectedListing.farmerTrust.completedOrders}</b><span>{locale === "ta" ? "நிறைவு செய்யப்பட்ட ஆர்டர்கள்" : "Completed orders"}</span></div></div>
           <div className="trust-farm"><span>{locale === "ta" ? "இருப்பிடம்" : "Location"}</span><b>{selectedListing.place}</b></div>
-          <div className="card-actions trust-actions"><button className="message-action" onClick={() => { setModal("message"); }}>{locale === "ta" ? "விவசாயியைத் தொடர்புகொள்" : "Contact farmer"}<MessageCircle size={15} /></button>{role === "BUYER" && <button className="message-action" onClick={openFarmerReport}><Flag size={14} />{locale === "ta" ? "விவசாயியைப் புகாரளி" : "Report farmer"}</button>}</div>
+          <div className="card-actions trust-actions">{selectedListing.farmerTrust.id !== session?.id && role !== "ADMIN" && <button className="message-action" onClick={() => { setModal("message"); }}>{locale === "ta" ? "விவசாயியைத் தொடர்புகொள்" : "Contact farmer"}<MessageCircle size={15} /></button>}{role === "BUYER" && selectedListing.farmerTrust.id !== session?.id && <button className="message-action" onClick={openFarmerReport}><Flag size={14} />{locale === "ta" ? "விவசாயியைப் புகாரளி" : "Report farmer"}</button>}</div>
           <button className="primary-button full-button" onClick={() => { setQuery(selectedListing.farmer); setModal(null); }}>{locale === "ta" ? "விவசாயியின் விளைபொருட்களைக் காண்க" : "View farmer products"}<ArrowRight size={16} /></button></>}
       </section></div>}
       <nav className="mobile-nav" aria-label={t.primaryNavigation}>{navItems.slice(0, role === "ADMIN" ? 6 : 4).map(({ id, label, icon: Icon }) => <button key={id} className={view === id ? "mobile-nav-active" : ""} onClick={() => chooseView(id)}><Icon size={19} /><span>{label}</span></button>)}</nav>

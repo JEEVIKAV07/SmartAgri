@@ -23,12 +23,14 @@ Without PostgreSQL, the app opens in an explicitly labeled demo preview. Preview
 ## Workflows
 
 - Buyers can search and filter produce, place and track orders, message farmers, and review completed orders.
+- Buyers and farmers can add listings to browser-stored favourites; favourites are kept separate for each signed-in account.
 - Farmers can publish, edit, pause, resume, and remove their own listings, including a required JPEG, PNG, or WebP product photo (up to 5 MB), quality grade, harvest date, and availability end date. Advance, cancel, dispatch, and coordinate pickup for orders.
 - Orders use cash on pickup. Buyers mark when they have handed over cash, then farmers confirm receipt; both parties see whether payment is complete or incomplete.
 - Pickup confirmations are shared in both parties' order lists and refresh automatically. Buyers see reports they submitted, farmers see reports about them, and administrators can review and resolve all reports.
 - Buyers can view published ratings and completed-order counts; open a farmer profile, contact a grower, and report a product or farmer with a reason and details.
 - Administrators can review and manage products and member accounts, inspect activity, moderate reviews, and resolve or dismiss reports.
 - English and Tamil are available throughout the interface; the choice is saved locally and INR values use locale-aware formatting.
+- The Help center provides bilingual FAQs and direct navigation to marketplace, orders, messages, and weather.
 - Buyers and farmers can create accounts, sign in, and exchange persistent messages in a live-refreshing, chat-style inbox. Account and message storage requires PostgreSQL.
 - Orders follow explicit status transitions. Cash payment confirmations are recorded for both parties; this MVP does not collect payment.
 - Product quantity is reserved atomically when a farmer accepts an order. If an accepted or ready order is cancelled, its quantity is returned to stock; unaccepted cancellations do not affect inventory.
