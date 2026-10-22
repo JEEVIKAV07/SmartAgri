@@ -28,6 +28,12 @@ describe("order inventory transitions", () => {
     let available = stock;
     const calls: string[] = [];
     const operations = {
+      reserveStock: async (listingId: string, quantity: number) => {
+        calls.push(`reserve:${listingId}:${quantity}`);
+        if (available < quantity) return false;
+        available -= quantity;
+        return true;
+      },
       releaseStock: async (listingId: string, quantity: number) => {
         calls.push(`release:${listingId}:${quantity}`);
         available += quantity;
@@ -43,16 +49,25 @@ describe("order inventory transitions", () => {
   it("does not reserve stock again when a farmer accepts an order", async () => {
     const state = createOperations(6);
 
-    await transitionOrderWithInventory(state.operations, order, "ACCEPTED");
+    await transitionOrderWithInventory(state.operations, { ...order, stockReservedAt: new Date() }, "ACCEPTED");
 
     expect(state.available).toBe(6);
     expect(state.calls).toEqual(["status:order-1:PLACED:ACCEPTED"]);
   });
 
+  it("reserves stock when accepting a legacy placed order", async () => {
+    const state = createOperations(6);
+
+    await transitionOrderWithInventory(state.operations, order, "ACCEPTED");
+
+    expect(state.available).toBe(2);
+    expect(state.calls).toEqual(["reserve:listing-1:4", "status:order-1:PLACED:ACCEPTED"]);
+  });
+
   it("releases stock when a placed order is cancelled", async () => {
     const state = createOperations(2);
 
-    await transitionOrderWithInventory(state.operations, order, "CANCELLED");
+    await transitionOrderWithInventory(state.operations, { ...order, stockReservedAt: new Date() }, "CANCELLED");
 
     expect(state.available).toBe(6);
     expect(state.calls).toEqual(["release:listing-1:4", "status:order-1:PLACED:CANCELLED"]);
@@ -61,7 +76,7 @@ describe("order inventory transitions", () => {
   it("releases reserved stock when an accepted order is cancelled", async () => {
     const state = createOperations(2);
 
-    await transitionOrderWithInventory(state.operations, { ...order, status: "ACCEPTED" }, "CANCELLED");
+    await transitionOrderWithInventory(state.operations, { ...order, status: "ACCEPTED", stockReservedAt: new Date() }, "CANCELLED");
 
     expect(state.available).toBe(6);
     expect(state.calls).toEqual(["release:listing-1:4", "status:order-1:ACCEPTED:CANCELLED"]);
@@ -71,7 +86,7 @@ describe("order inventory transitions", () => {
     const state = createOperations(6);
     state.operations.updateStatus = async () => false;
 
-    await expect(transitionOrderWithInventory(state.operations, order, "ACCEPTED"))
+    await expect(transitionOrderWithInventory(state.operations, { ...order, stockReservedAt: new Date() }, "ACCEPTED"))
       .rejects.toMatchObject({ reason: "CONCURRENT_UPDATE" });
   });
 });
