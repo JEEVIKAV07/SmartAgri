@@ -546,6 +546,9 @@ export default function Home() {
     const quantity = Number(new FormData(event.currentTarget).get("quantity"));
     const saved = await sendToApi("/api/orders", { listingId: selectedListing.id, quantity });
     if (!saved) return;
+    setListings((current) => current.map((listing) => listing.id === selectedListing.id
+      ? { ...listing, quantity: Math.max(0, listing.quantity - quantity) }
+      : listing));
     setModal(null);
     setView("orders");
     setNotice(t.orderPlaced);
