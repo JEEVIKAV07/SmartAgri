@@ -65,6 +65,7 @@ export async function POST(request: Request) {
           unitPrice: listing.pricePerKg,
           total: parsed.data.quantity * listing.pricePerKg,
           note: parsed.data.note,
+          stockReservedAt: new Date(),
         },
       });
       return { order } as const;
@@ -129,6 +130,19 @@ export async function PATCH(request: Request) {
       }
 
       await transitionOrderWithInventory({
+        reserveStock: async (listingId, quantity) => {
+          const reserved = await tx.listing.updateMany({
+            where: { id: listingId, quantity: { gte: quantity } },
+            data: { quantity: { decrement: quantity } },
+          });
+          if (reserved.count !== 1) return false;
+          const marked = await tx.order.updateMany({
+            where: { id: order.id, status: "PLACED", stockReservedAt: null },
+            data: { stockReservedAt: new Date() },
+          });
+          if (marked.count !== 1) throw new OrderTransitionError("CONCURRENT_UPDATE");
+          return true;
+        },
         releaseStock: async (listingId, quantity) => {
           await tx.listing.update({ where: { id: listingId }, data: { quantity: { increment: quantity } } });
         },
