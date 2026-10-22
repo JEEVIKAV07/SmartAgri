@@ -17,6 +17,7 @@ type DemoOrder = {
   id: string;
   crop: string;
   person: string;
+  isBuyer: boolean;
   quantity: number;
   unit: string;
   total: number;
@@ -139,7 +140,7 @@ export default function Home() {
       orders?: Array<{
         id: string;
         listing: { crop: string; unit: string };
-        buyer: { name: string };
+        buyer: { id: string; name: string };
         farmer: { name: string };
         quantity: number;
         total: number;
@@ -154,7 +155,8 @@ export default function Home() {
     setOrders((result.orders ?? []).map((item) => ({
       id: item.id,
       crop: item.listing.crop,
-      person: user.role === "FARMER" ? item.buyer.name : item.farmer.name,
+      person: item.buyer.id === user.id ? item.farmer.name : item.buyer.name,
+      isBuyer: item.buyer.id === user.id,
       quantity: item.quantity,
       unit: item.listing.unit,
       total: item.total,
@@ -538,11 +540,7 @@ export default function Home() {
     if (!selectedListing) return;
     if (!session) {
       openAuthModal("login");
-      setNotice(locale === "ta" ? "ஆர்டர் செய்ய வாங்குபவர் கணக்கில் உள்நுழையவும்." : "Sign in with a buyer account to place an order.");
-      return;
-    }
-    if (session.role !== "BUYER") {
-      setNotice(locale === "ta" ? "ஆர்டர் செய்ய வாங்குபவர் கணக்கு தேவை." : "A buyer account is required to place an order.");
+      setNotice(locale === "ta" ? "ஆர்டர் செய்ய உள்நுழையவும்." : "Sign in to place an order.");
       return;
     }
     const quantity = Number(new FormData(event.currentTarget).get("quantity"));
@@ -817,8 +815,8 @@ export default function Home() {
           {view === "market" && <>
             <section className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line" />{t.goodMorning}</div><h1>{role === "FARMER" ? t.farmerGreeting : role === "ADMIN" ? t.adminGreeting : t.buyerGreeting}</h1><p>{role === "FARMER" ? t.farmerSubhead : role === "ADMIN" ? t.adminSubhead : t.buyerSubhead}</p></div><div className="welcome-date"><span>{t.today}</span><b>{new Intl.DateTimeFormat(locale === "ta" ? "ta-IN" : "en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</b><small>{t.coimbatoreRegion}</small></div></section>
             <section className="insight-row" aria-label={t.marketInsights}><div className="insight-card weather-insight"><span className="insight-icon"><CloudSun size={19} /></span><div><small>{`${locale === "ta" ? "வானிலை" : "Weather"} · ${weather?.location ?? weatherLocation}`}</small><b>{weather ? `${Math.round(weather.current.temperatureC)}°C · ${weather.current.condition}` : weatherLoading ? (locale === "ta" ? "ஏற்றுகிறது…" : "Loading forecast…") : locale === "ta" ? "நேரடி வானிலை கிடைக்கவில்லை" : "Live weather unavailable"}</b><span>{weather ? `${locale === "ta" ? "மழை வாய்ப்பு" : "Rain chance"}: ${weather.forecast[0]?.chanceOfRain ?? 0}% · ${weather.current.humidity}% ${locale === "ta" ? "ஈரப்பதம்" : "humidity"}` : weatherError || (locale === "ta" ? "இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்" : "Check your connection or retry")}</span></div><button className="insight-state insight-link" onClick={() => chooseView("weather")}>{locale === "ta" ? "அறிக்கை" : "View report"}</button>{weatherError && <button className="insight-state insight-link" onClick={() => void loadWeather(weatherLocation)}>{locale === "ta" ? "மீண்டும்" : "Retry"}</button>}</div><div className="insight-note"><span className="note-sun"><Sun size={17} /></span><div><b>{t.planPickup}</b><span>{t.marketplaceAvailable}</span></div><ArrowRight size={16} /></div></section>
-            <section className="section-head listing-section-head"><div><div className="eyebrow"><span className="eyebrow-line" />{role === "FARMER" ? t.yourNetwork : t.freshFromFarm}</div><h2>{role === "FARMER" ? (locale === "ta" ? "எனது விளைபொருட்கள்" : "My products") : t.findYourHarvest}</h2></div><div className="market-actions">{role === "FARMER" && <button className="primary-button" onClick={openCreateListing}><Plus size={17} />{t.addListing}</button>}{role === "BUYER" && <><button className="text-button" onClick={() => setSortLow((value) => !value)}><ArrowDownUp size={16} />{sortLow ? t.priceLowHigh : t.sortByPrice}</button><button className="text-button" onClick={() => visibleListings[0] && openReport(visibleListings[0])}><Flag size={15} />{locale === "ta" ? "விளைபொருளைப் புகாரளி" : "Report product"}</button></>}<button className={`favourites-filter ${showFavourites ? "favourites-filter-active" : ""}`} aria-pressed={showFavourites} onClick={() => setShowFavourites((current) => !current)}><Star size={15} fill={showFavourites ? "currentColor" : "none"} />{showFavourites ? favouriteText.showAllProducts : favouriteText.favouriteProducts}</button></div></section>
-            <section className="market-tools" aria-label={t.marketFilters}><label className="search-field"><Search size={17} /><input aria-label={t.searchProduce} placeholder={t.searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd></label><label className="filter-field"><Filter size={16} /><select aria-label={t.filterByCrop} value={cropFilter} onChange={(event) => setCropFilter(event.target.value)}><option>All crops</option><option>Tomato</option><option>Banana</option><option>Paddy</option><option>Onion</option></select><ChevronDown size={14} /></label><span className="result-count">{visibleListings.length} {t.availableLots}</span></section>
+            <section className="section-head listing-section-head"><div><div className="eyebrow"><span className="eyebrow-line" />{role === "FARMER" ? t.yourNetwork : t.freshFromFarm}</div><h2>{role === "FARMER" ? (locale === "ta" ? "எனது விளைபொருட்கள்" : "My products") : t.findYourHarvest}</h2></div>{role === "FARMER" ? <button className="primary-button" onClick={openCreateListing}><Plus size={17} />{t.addListing}</button> : role === "BUYER" ? <div className="market-actions"><button className="text-button" onClick={() => setSortLow((value) => !value)}><ArrowDownUp size={16} />{sortLow ? t.priceLowHigh : t.sortByPrice}</button><button className="text-button" onClick={() => visibleListings[0] && openReport(visibleListings[0])}><Flag size={15} />{locale === "ta" ? "விளைபொருளைப் புகாரளி" : "Report product"}</button></div> : null}</section>
+            <section className="market-tools" aria-label={t.marketFilters}><label className="search-field"><Search size={17} /><input aria-label={t.searchProduce} placeholder={t.searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} /><kbd>⌘ K</kbd></label><label className="filter-field"><Filter size={16} /><select aria-label={t.filterByCrop} value={cropFilter} onChange={(event) => setCropFilter(event.target.value)}><option>All crops</option><option>Tomato</option><option>Banana</option><option>Paddy</option><option>Onion</option></select><ChevronDown size={14} /></label><button className={`favourites-filter ${showFavourites ? "favourites-filter-active" : ""}`} aria-pressed={showFavourites} onClick={() => setShowFavourites((current) => !current)}><Star size={15} fill={showFavourites ? "currentColor" : "none"} />{showFavourites ? favouriteText.showAllProducts : favouriteText.favouriteProducts}</button><span className="result-count">{visibleListings.length} {t.availableLots}</span></section>
             <section className="listing-grid" aria-label={t.produceListings}>
               {visibleListings.map((listing) => {
                 const isOwner = role === "FARMER" && listing.farmerTrust.id === session?.id;
@@ -845,7 +843,7 @@ export default function Home() {
                       </button>
                       <span className="place"><MapPin size={13} />{listing.place.split(",")[0]}</span>
                     </div>
-                    <div className="card-actions">{canManageListing ? <><button className="message-action" onClick={() => openEditListing(listing)}><Pencil size={14} />{locale === "ta" ? "திருத்து" : "Edit"}</button><button className="buy-action" onClick={() => updateListing(listing, listing.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>{listing.status === "ACTIVE" ? t.pauseListing : listing.status === "PAUSED" ? (locale === "ta" ? "மீண்டும் வெளியிடு" : "Resume") : (locale === "ta" ? "மீட்டமை" : "Restore")}</button><button className="icon-button listing-remove" aria-label={locale === "ta" ? "பட்டியலை நீக்கு" : "Remove listing"} title={locale === "ta" ? "பட்டியலை நீக்கு" : "Remove listing"} onClick={() => updateListing(listing, "REMOVED")}><Trash2 size={15} /></button></> : <><button className="message-action" onClick={() => openMessage(listing)}><MessageCircle size={15} />{t.message}</button>{role === "BUYER" ? <button className="buy-action" onClick={() => openOrder(listing)}>{t.placeOrder}<ArrowRight size={15} /></button> : <button className="buy-action" onClick={() => openOrder(listing)}>{t.viewLot}<ArrowRight size={15} /></button>}</>}</div>
+                    <div className="card-actions">{canManageListing ? <><button className="message-action" onClick={() => openEditListing(listing)}><Pencil size={14} />{locale === "ta" ? "திருத்து" : "Edit"}</button><button className="buy-action" onClick={() => updateListing(listing, listing.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>{listing.status === "ACTIVE" ? t.pauseListing : listing.status === "PAUSED" ? (locale === "ta" ? "மீண்டும் வெளியிடு" : "Resume") : (locale === "ta" ? "மீட்டமை" : "Restore")}</button><button className="icon-button listing-remove" aria-label={locale === "ta" ? "பட்டியலை நீக்கு" : "Remove listing"} title={locale === "ta" ? "பட்டியலை நீக்கு" : "Remove listing"} onClick={() => updateListing(listing, "REMOVED")}><Trash2 size={15} /></button></> : <><button className="message-action" onClick={() => openMessage(listing)}><MessageCircle size={15} />{t.message}</button><button className="buy-action" onClick={() => openOrder(listing)}>{t.placeOrder}<ArrowRight size={15} /></button></>}</div>
                   </div>
                 </article>;
               })}
@@ -856,21 +854,22 @@ export default function Home() {
 
           {view === "orders" && <section className="workspace-view">
             <div className="orders-heading">
-              <div><div className="eyebrow"><span className="eyebrow-line" />{t.orderDesk}</div><h1>{role === "FARMER" ? t.incomingOrders : t.yourOrders}</h1></div>
+              <div><div className="eyebrow"><span className="eyebrow-line" />{t.orderDesk}</div><h1>{role === "FARMER" ? (locale === "ta" ? "வரும் மற்றும் நான் செய்த ஆர்டர்கள்" : "Incoming & placed orders") : t.yourOrders}</h1></div>
               <button className="text-button" onClick={() => session ? void loadOrders(session).catch((error: unknown) => setOrdersError(error instanceof Error ? error.message : "Orders could not be refreshed.")) : openAuthModal("login")}>{locale === "ta" ? "புதுப்பி" : "Refresh orders"}</button>
             </div>
-            <p className="view-intro">{role === "FARMER" ? (locale === "ta" ? "ஆர்டரை ஏற்கவும், ரத்து செய்யவும் அல்லது வாங்குபவர் எடுத்துச் செல்லத் தயாராக உள்ளதாகக் குறிக்கவும்." : "Accept or cancel incoming orders, then mark accepted orders ready for buyer pickup.") : t.orderDeskIntro}</p>
+            <p className="view-intro">{role === "FARMER" ? (locale === "ta" ? "உங்கள் பட்டியலுக்கான ஆர்டர்களை நிர்வகிக்கவும்; மற்ற விவசாயிகளிடம் செய்த ஆர்டர்களையும் கண்காணிக்கவும்." : "Manage orders for your listings and track orders you place with other farmers.") : t.orderDeskIntro}</p>
             {ordersError && <div className="auth-error" role="alert">{ordersError}</div>}
             <div className="order-summary"><div><span>{t.openOrders}</span><b>{orders.filter((order) => ["PLACED", "ACCEPTED", "READY"].includes(order.status)).length}</b></div><div><span>{t.completedThisMonth}</span><b>{orders.filter((order) => order.status === "COMPLETED").length}</b></div><div><span>{t.orderValue}</span><b>{currency(orders.reduce((sum, order) => sum + order.total, 0), locale)}</b></div></div>
             {orders.length === 0
-              ? <div className="empty-state"><ClipboardList size={24} /><b>{!session ? (locale === "ta" ? "ஆர்டர்களைப் பார்க்க உள்நுழையவும்" : "Sign in to view orders") : locale === "ta" ? "ஆர்டர்கள் இன்னும் வரவில்லை" : "No orders yet"}</b><span>{!session ? (locale === "ta" ? "உங்கள் ஆர்டர்களையும் புதிய வாங்குபவர் ஆர்டர்களையும் பார்க்க உள்நுழையவும்." : "Sign in to see your orders and incoming buyer orders.") : role === "FARMER" ? (locale === "ta" ? "வாங்குபவர் உங்கள் விளைபொருளை ஆர்டர் செய்ததும் இங்கே தோன்றும்." : "Orders placed for your listings will appear here.") : (locale === "ta" ? "நீங்கள் ஆர்டர் செய்ததும் இங்கே தோன்றும்." : "Your orders will appear here after checkout.")}{!session && <button className="row-action" onClick={() => openAuthModal("login")}>{t.signIn}</button>}</span></div>
-              : <div className="table-wrap"><table><thead><tr><th>{t.orderId}</th><th>{t.produce}</th><th>{role === "FARMER" ? t.buyer : t.farmer}</th><th>{t.quantity}</th><th>{t.total}</th><th>{t.status}</th><th>{locale === "ta" ? "கட்டணம்" : "Payment"}</th><th>{t.action}</th></tr></thead><tbody>{orders.map((order) => {
-                const canMarkPaid = role === "BUYER"
+              ? <div className="empty-state"><ClipboardList size={24} /><b>{!session ? (locale === "ta" ? "ஆர்டர்களைப் பார்க்க உள்நுழையவும்" : "Sign in to view orders") : locale === "ta" ? "ஆர்டர்கள் இன்னும் வரவில்லை" : "No orders yet"}</b><span>{!session ? (locale === "ta" ? "உங்கள் ஆர்டர்களையும் புதிய வாங்குபவர் ஆர்டர்களையும் பார்க்க உள்நுழையவும்." : "Sign in to see your orders and incoming buyer orders.") : role === "FARMER" ? (locale === "ta" ? "மற்ற விவசாயிகளிடமிருந்து வாங்கவும் அல்லது உங்கள் விளைபொருளை விற்பனைக்கு பட்டியலிடவும்." : "Place an order from another farmer’s listing or wait for orders on your own listings.") : (locale === "ta" ? "நீங்கள் ஆர்டர் செய்ததும் இங்கே தோன்றும்." : "Your orders will appear here after checkout.")}{!session && <button className="row-action" onClick={() => openAuthModal("login")}>{t.signIn}</button>}</span></div>
+              : <div className="table-wrap"><table><thead><tr><th>{t.orderId}</th><th>{t.produce}</th><th>{role === "FARMER" ? (locale === "ta" ? "மற்றவர்" : "Other party") : t.farmer}</th><th>{t.quantity}</th><th>{t.total}</th><th>{t.status}</th><th>{locale === "ta" ? "கட்டணம்" : "Payment"}</th><th>{t.action}</th></tr></thead><tbody>{orders.map((order) => {
+                const isFarmerSeller = role === "FARMER" && !order.isBuyer;
+                const canMarkPaid = order.isBuyer && role !== "ADMIN"
                   && order.paymentStatus === "INCOMPLETE"
                   && !order.buyerPaymentMarkedAt
                   && order.status !== "CANCELLED"
                   && (order.status === "READY" || order.status === "COMPLETED");
-                const canConfirmPayment = role === "FARMER"
+                const canConfirmPayment = isFarmerSeller
                   && order.paymentStatus === "INCOMPLETE"
                   && Boolean(order.buyerPaymentMarkedAt)
                   && order.status !== "CANCELLED"
@@ -884,7 +883,7 @@ export default function Home() {
                   <td>{currency(order.total, locale)}</td>
                   <td>
                     <span className={`status status-${order.status.toLowerCase()}`}>
-                      {order.status === "COMPLETED" && role === "FARMER"
+                      {order.status === "COMPLETED" && isFarmerSeller
                         ? (locale === "ta" ? "வாங்குபவர் எடுத்துக்கொண்டார்" : "Buyer confirmed pickup")
                         : order.status === "READY" && role !== "FARMER"
                           ? (locale === "ta" ? "வாங்குபவர் எடுத்துச் செல்லத் தயார்" : "Ready for buyer pickup")
@@ -899,24 +898,24 @@ export default function Home() {
                         : (locale === "ta" ? "கட்டணம் முடியவில்லை" : "Payment incomplete")}
                     </span>
                     {order.paymentStatus === "INCOMPLETE" && <small>{locale === "ta" ? "வாங்குபவர் பணம் வழங்கியதாகக் குறிப்பிட்டு, விவசாயி பெற்றதை உறுதிப்படுத்துவார்." : "Buyer marks cash handed over; farmer confirms receipt."}</small>}
-                    {order.paymentStatus === "INCOMPLETE" && order.buyerPaymentMarkedAt && <small>{role === "FARMER"
+                    {order.paymentStatus === "INCOMPLETE" && order.buyerPaymentMarkedAt && <small>{isFarmerSeller
                       ? (locale === "ta" ? "வாங்குபவர் பணம் செலுத்தியதாகக் குறிப்பிட்டார்" : "Buyer marked as paid · confirm receipt")
                       : (locale === "ta" ? "விவசாயி உறுதிப்படுத்த காத்திருக்கிறது" : "Waiting for farmer confirmation")}</small>}
                   </div></td>
                   <td><div className="order-action-stack">
                     {updatingOrderId === order.id
                       ? <span className="muted-cell">{locale === "ta" ? "சேமிக்கிறது…" : "Saving…"}</span>
-                      : order.status === "PLACED" && role === "FARMER"
+                      : order.status === "PLACED" && isFarmerSeller
                         ? <><button className="row-action" onClick={() => void updateOrder(order, "ACCEPTED")}>{t.accept}</button>{canCancel ? <button className="reject-button" onClick={() => void updateOrder(order, "CANCELLED")}>{locale === "ta" ? "ரத்து" : "Cancel order"}</button> : <small className="muted-cell">{locale === "ta" ? "கட்டணம் குறிக்கப்பட்டதால் ரத்து செய்ய முடியாது" : "Payment marked; coordinate before cancelling"}</small>}</>
-                        : order.status === "ACCEPTED" && role === "FARMER"
+                        : order.status === "ACCEPTED" && isFarmerSeller
                           ? <><button className="row-action" onClick={() => void updateOrder(order, "READY")}>{locale === "ta" ? "வாங்குபவர் எடுக்கத் தயார்" : "Dispatch · ready for pickup"}</button>{canCancel ? <button className="reject-button" onClick={() => void updateOrder(order, "CANCELLED")}>{locale === "ta" ? "ரத்து" : "Cancel order"}</button> : <small className="muted-cell">{locale === "ta" ? "கட்டணம் குறிக்கப்பட்டதால் ரத்து செய்ய முடியாது" : "Payment marked; coordinate before cancelling"}</small>}</>
-                          : order.status === "READY" && role === "FARMER"
+                          : order.status === "READY" && isFarmerSeller
                             ? canCancel ? <button className="reject-button" onClick={() => void updateOrder(order, "CANCELLED")}>{locale === "ta" ? "ரத்து" : "Cancel order"}</button> : <small className="muted-cell">{locale === "ta" ? "கட்டணம் குறிக்கப்பட்டதால் ரத்து செய்ய முடியாது" : "Payment marked; coordinate before cancelling"}</small>
-                            : order.status === "READY" && role === "BUYER"
+                            : order.status === "READY" && order.isBuyer
                               ? <button className="row-action" onClick={() => void updateOrder(order, "COMPLETED")}>{locale === "ta" ? "எடுத்துக்கொண்டேன்" : "Confirm pickup"}</button>
-                              : order.status === "COMPLETED" && role === "BUYER"
+                              : order.status === "COMPLETED" && role === "BUYER" && order.isBuyer
                                 ? <button className="row-action" onClick={() => { setSelectedOrder(order); setModal("review"); }}>{t.leaveReview}</button>
-                                : role === "BUYER" && ["PLACED", "ACCEPTED", "READY"].includes(order.status)
+                                : order.isBuyer && ["PLACED", "ACCEPTED", "READY"].includes(order.status)
                                     ? canCancel ? <button className="reject-button" onClick={() => void updateOrder(order, "CANCELLED")}>{locale === "ta" ? "ரத்து" : "Cancel order"}</button> : <small className="muted-cell">{locale === "ta" ? "கட்டணம் குறித்து விவசாயியிடம் பேசுங்கள்" : "Contact farmer before cancelling after payment"}</small>
                                   : <span className="muted-cell">{t.noAction}</span>}
                     {updatingOrderId === order.id
