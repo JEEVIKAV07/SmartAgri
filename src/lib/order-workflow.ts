@@ -13,7 +13,7 @@ type InventoryOperations = {
 };
 
 export class OrderTransitionError extends Error {
-  constructor(readonly reason: "INVALID_TRANSITION" | "INSUFFICIENT_STOCK" | "CONCURRENT_UPDATE") {
+  constructor(readonly reason: "INVALID_TRANSITION" | "CONCURRENT_UPDATE") {
     super(reason);
     this.name = "OrderTransitionError";
   }
