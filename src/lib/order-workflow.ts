@@ -8,7 +8,6 @@ type OrderToTransition = {
 };
 
 type InventoryOperations = {
-  reserveStock: (listingId: string, quantity: number) => Promise<boolean>;
   releaseStock: (listingId: string, quantity: number) => Promise<void>;
   updateStatus: (orderId: string, from: OrderStatus, to: OrderStatus) => Promise<boolean>;
 };
@@ -41,11 +40,7 @@ export async function transitionOrderWithInventory(
     throw new OrderTransitionError("INVALID_TRANSITION");
   }
 
-  if (nextStatus === "ACCEPTED" && !(await operations.reserveStock(order.listingId, order.quantity))) {
-    throw new OrderTransitionError("INSUFFICIENT_STOCK");
-  }
-
-  if (nextStatus === "CANCELLED" && order.status !== "PLACED") {
+  if (nextStatus === "CANCELLED") {
     await operations.releaseStock(order.listingId, order.quantity);
   }
 
